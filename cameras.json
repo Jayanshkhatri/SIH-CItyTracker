@@ -1,0 +1,22 @@
+{
+  "cameras": {
+    "CAM_A": {
+      "name": "CAM_A - Connaught Place",
+      "lat": 28.6315,
+      "lon": 77.2167
+    },
+    "CAM_B": {
+      "name": "CAM_B - India Gate",
+      "lat": 28.6129,
+      "lon": 77.2295
+    },
+    "CAM_C": {
+      "name": "CAM_C - Karol Bagh",
+      "lat": 28.6519,
+      "lon": 77.1909
+    }
+  },
+  "route_order": ["CAM_A", "CAM_B", "CAM_C"],
+  "speed_limit_kmh": 80,
+  "max_travel_hours_before_anomaly": 3
+}
