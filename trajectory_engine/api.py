@@ -1,17 +1,19 @@
 """FastAPI read API for the Phase 9 dashboard/GIS contract."""
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, Callable
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from phase9_contracts import ContractError, alert_resource, error, pagination
-from phase9_logging import logger, request_id
-from phase9_service import Phase9Service, build_local_demo_service
+from api_contracts import ContractError, alert_resource, error, pagination
+from logging_utils import logger, request_id
+from trajectory_service import Phase9Service, build_local_demo_service
 
 
 class ContractResponse(BaseModel):
@@ -30,6 +32,19 @@ def create_app(service: Phase9Service | None = None,
         service, owned_directory = build_local_demo_service()
     app = FastAPI(title="SIH26127 Trajectory Intelligence API", version="2.50",
                   description="Read-only API over verified trajectory, analytics, alert, and GIS outputs.")
+    cors_origins = [
+        origin.strip()
+        for origin in os.getenv("TRAJECTORY_CORS_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=False,
+            allow_methods=["GET"],
+            allow_headers=["Accept", "Content-Type", "Authorization"],
+        )
     app.state.service = service
     app.state.demo_directory = owned_directory
     app.state.runtime_status_provider = runtime_status_provider

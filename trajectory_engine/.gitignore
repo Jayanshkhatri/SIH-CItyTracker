@@ -9,3 +9,9 @@ demo.db-shm
 .venv/
 __pycache__/
 *.pyc
+# Local runtime artifacts
+runtime_store.json
+phase10_runtime_store.json
+phase10_trajectory_store.json
+*.tmp
+.pytest_cache/

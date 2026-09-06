@@ -6,14 +6,15 @@ repository; that is its sole Supabase write.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import date
 from typing import Any, Iterable
 
-import trajectory as engine
-from phase9_database import SupabaseEventReader, SupabasePucRepository
-from phase9_logging import logger, timed
+import trajectory_engine as engine
+from supabase_repository import SupabaseEventReader, SupabasePucRepository
+from logging_utils import logger, timed
 from puc_verification import PucVerificationResult, verify_puc
-from trajectory_phase7 import Phase7TrajectoryRepository
+from trajectory_repository import Phase7TrajectoryRepository
 
 
 def normalize_source_events(rows: Iterable[dict[str, Any]], camera_id_map: dict[str, str] | None = None) -> tuple[list[dict[str, Any]], dict[str, int]]:
@@ -49,7 +50,12 @@ class ReadOnlyDatabasePipeline:
         logger.info("pipeline_source_normalized accepted=%s rejected=%s", stats["accepted_count"], stats["rejected_count"])
         return events, stats
 
-    def reconstruct_to_local_repository(self, events: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    def reconstruct_to_local_repository(
+        self,
+        events: Iterable[dict[str, Any]],
+        *,
+        network: Any | None = None,
+    ) -> dict[str, Any]:
         """Run the verified core stages and persist only to the local repository.
 
         This is orchestration, not a second trajectory algorithm. Production
@@ -57,25 +63,26 @@ class ReadOnlyDatabasePipeline:
         local repository path; source database rows are never changed.
         """
         source = list(events)
-        with timed("pipeline_reconstruct", source_events=len(source)):
-            filtered, low_confidence_removed = engine.filter_low_confidence_events(source)
-            filtered, duplicate_removed = engine.remove_same_camera_duplicates(filtered)
-            trajectories = engine.build_trajectories(filtered)
-            fuzzy_matches = engine.find_fuzzy_plate_matches(filtered)
-            observations, seen = [], set()
-            for match in fuzzy_matches:
-                for event in (match["event_a"], match["event_b"]):
-                    if event["id"] not in seen:
-                        observations.append(event); seen.add(event["id"])
-            associations = engine.run_trajectory_level_association(observations, trajectories)
-            consistency = engine.apply_consistency_validation(associations, trajectories)
-            confidence = engine.apply_confidence_aggregation(consistency, trajectories)
-            confidence = engine.apply_step_2_26_validation(confidence, trajectories)
-            continuity = engine.run_trajectory_continuity_validation(trajectories)
-            quality = engine.run_trajectory_quality_scoring(trajectories, continuity)
-            usability = engine.run_trajectory_usability_classification(quality)
-            identities = engine.build_trajectory_identity_records(trajectories, quality, usability, confidence)
-            self.repository.bootstrap(identities, filtered)
+        with _legacy_engine_network(network):
+            with timed("pipeline_reconstruct", source_events=len(source)):
+                filtered, low_confidence_removed = engine.filter_low_confidence_events(source)
+                filtered, duplicate_removed = engine.remove_same_camera_duplicates(filtered)
+                trajectories = engine.build_trajectories(filtered)
+                fuzzy_matches = engine.find_fuzzy_plate_matches(filtered)
+                observations, seen = [], set()
+                for match in fuzzy_matches:
+                    for event in (match["event_a"], match["event_b"]):
+                        if event["id"] not in seen:
+                            observations.append(event); seen.add(event["id"])
+                associations = engine.run_trajectory_level_association(observations, trajectories)
+                consistency = engine.apply_consistency_validation(associations, trajectories)
+                confidence = engine.apply_confidence_aggregation(consistency, trajectories)
+                confidence = engine.apply_step_2_26_validation(confidence, trajectories)
+                continuity = engine.run_trajectory_continuity_validation(trajectories)
+                quality = engine.run_trajectory_quality_scoring(trajectories, continuity)
+                usability = engine.run_trajectory_usability_classification(quality)
+                identities = engine.build_trajectory_identity_records(trajectories, quality, usability, confidence)
+                self.repository.bootstrap(identities, filtered)
         result = {"source_event_count": len(source), "accepted_event_count": len(filtered),
                   "low_confidence_removed": len(low_confidence_removed), "duplicate_removed": len(duplicate_removed),
                   "trajectory_count": len(identities), "persistence_target": "LOCAL_PHASE7_REPOSITORY_ONLY"}
@@ -112,6 +119,43 @@ class ReadOnlyDatabasePipeline:
                 except ValueError:
                     continue
         return max(values) if values else None
+
+
+@contextmanager
+def _legacy_engine_network(network: Any | None):
+    """Temporarily adapt the verified legacy checks to an explicit network.
+
+    The legacy engine exposes camera data and graph adjacency as module globals.
+    This narrow compatibility boundary lets its existing connectivity validation
+    operate on the runtime's actual camera IDs and directed connections without
+    changing the verified algorithm or weakening any checks.
+    """
+    if network is None:
+        yield
+        return
+
+    cameras = getattr(network, "cameras", None)
+    outgoing = getattr(network, "_outgoing", None)
+    if not isinstance(cameras, dict) or not isinstance(outgoing, dict):
+        raise ValueError("Trajectory network must expose cameras and directed connections")
+
+    graph = {
+        camera_id: [
+            connection.destination_camera
+            for connection in connections
+            if connection.enabled
+        ]
+        for camera_id, connections in outgoing.items()
+    }
+    if set(graph) != set(cameras):
+        raise ValueError("Trajectory network graph must include every configured camera")
+
+    original_cameras, original_graph = engine.CAMERAS, engine.CAMERA_GRAPH
+    engine.CAMERAS, engine.CAMERA_GRAPH = cameras, graph
+    try:
+        yield
+    finally:
+        engine.CAMERAS, engine.CAMERA_GRAPH = original_cameras, original_graph
 
 
 def run_real_data_batch(*, connection_factory, repository: Phase7TrajectoryRepository,

@@ -4,7 +4,7 @@ import math
 
 # ============================================================
 # SIH26127 — CITY-WIDE AI TRAJECTORY ENGINE
-# STEP 2.25 — TRAJECTORY ASSOCIATION CONFIDENCE AGGREGATION
+# VERIFIED BASELINE THROUGH STEP 2.29 — TRAJECTORY ENGINE
 # ============================================================
 
 
@@ -3373,6 +3373,1403 @@ def verify_step_2_27(
 
 
 # ============================================================
+
+# ============================================================
+# STEP 2.28 — TRAJECTORY QUALITY & RELIABILITY SCORING
+# ============================================================
+
+HIGH_QUALITY_SCORE = 85
+MEDIUM_QUALITY_SCORE = 65
+
+
+def calculate_observation_quality(trajectory):
+    """
+    Calculates the observation-density component.
+
+    More observations provide stronger trajectory evidence,
+    but the score is capped so that long trajectories do not
+    automatically dominate shorter valid trajectories.
+    """
+    observation_count = len(trajectory)
+
+    if observation_count <= 1:
+        return 40.0
+
+    if observation_count == 2:
+        return 60.0
+
+    if observation_count == 3:
+        return 80.0
+
+    return 100.0
+
+
+def calculate_continuity_quality(continuity_result):
+    """
+    Converts Step 2.27 continuity validation into a percentage.
+    """
+    if continuity_result["total_checks"] == 0:
+        return 0.0
+
+    return (
+        continuity_result["passed_checks"]
+        / continuity_result["total_checks"]
+    ) * 100.0
+
+
+def calculate_trajectory_quality_score(
+    plate,
+    trajectory,
+    continuity_result
+):
+    """
+    Combines trajectory reliability signals into one
+    explainable quality score.
+
+    Components:
+        - Chronology
+        - Connectivity
+        - Movement
+        - Time gaps
+        - Observation density
+    """
+
+    checks = continuity_result["checks"]
+
+    chronology_score = (
+        100.0
+        if checks["chronology"]["passed"]
+        else 0.0
+    )
+
+    connectivity_score = (
+        100.0
+        if checks["connectivity"]["passed"]
+        else 0.0
+    )
+
+    movement_score = (
+        100.0
+        if checks["movement"]["passed"]
+        else 0.0
+    )
+
+    time_gap_score = (
+        100.0
+        if checks["time_gaps"]["passed"]
+        else 0.0
+    )
+
+    observation_score = calculate_observation_quality(
+        trajectory
+    )
+
+    continuity_score = calculate_continuity_quality(
+        continuity_result
+    )
+
+    overall_score = (
+        chronology_score * 0.20
+        + connectivity_score * 0.20
+        + movement_score * 0.20
+        + time_gap_score * 0.20
+        + observation_score * 0.20
+    )
+
+    if overall_score >= HIGH_QUALITY_SCORE:
+        quality_level = "HIGH QUALITY"
+    elif overall_score >= MEDIUM_QUALITY_SCORE:
+        quality_level = "MEDIUM QUALITY"
+    else:
+        quality_level = "LOW QUALITY"
+
+    return {
+        "plate_number": plate,
+        "observation_count": len(trajectory),
+        "quality_score": round(overall_score, 2),
+        "quality_level": quality_level,
+        "components": {
+            "chronology": round(chronology_score, 2),
+            "connectivity": round(connectivity_score, 2),
+            "movement": round(movement_score, 2),
+            "time_gaps": round(time_gap_score, 2),
+            "observation_density": round(
+                observation_score,
+                2
+            ),
+            "continuity": round(
+                continuity_score,
+                2
+            ),
+        },
+    }
+
+
+def run_trajectory_quality_scoring(
+    trajectories,
+    continuity_results
+):
+    """
+    Calculates quality scores for every trajectory.
+    """
+
+    continuity_by_plate = {
+        result["plate_number"]: result
+        for result in continuity_results
+    }
+
+    results = []
+
+    for plate, events in trajectories.items():
+
+        continuity_result = continuity_by_plate.get(
+            plate
+        )
+
+        if continuity_result is None:
+            continue
+
+        quality_result = (
+            calculate_trajectory_quality_score(
+                plate,
+                events,
+                continuity_result
+            )
+        )
+
+        results.append(
+            quality_result
+        )
+
+    return results
+
+
+def print_step_2_28_results(results):
+    print("\n")
+    print("=" * 80)
+    print(
+        "STEP 2.28 - "
+        "TRAJECTORY QUALITY & RELIABILITY SCORING"
+    )
+    print("=" * 80)
+
+    for result in results:
+
+        print("\nTRAJECTORY")
+        print("-" * 80)
+
+        print(
+            f"Plate: "
+            f"{result['plate_number']}"
+        )
+
+        print(
+            f"Observations: "
+            f"{result['observation_count']}"
+        )
+
+        print(
+            f"Quality score: "
+            f"{result['quality_score']:.2f}%"
+        )
+
+        print(
+            f"Quality level: "
+            f"{result['quality_level']}"
+        )
+
+        print("\nQUALITY COMPONENTS")
+        print("-" * 80)
+
+        components = result["components"]
+
+        print(
+            f"CHRONOLOGY       | "
+            f"{components['chronology']:.2f}%"
+        )
+
+        print(
+            f"CONNECTIVITY     | "
+            f"{components['connectivity']:.2f}%"
+        )
+
+        print(
+            f"MOVEMENT         | "
+            f"{components['movement']:.2f}%"
+        )
+
+        print(
+            f"TIME GAPS        | "
+            f"{components['time_gaps']:.2f}%"
+        )
+
+        print(
+            f"OBSERVATION DENSITY | "
+            f"{components['observation_density']:.2f}%"
+        )
+
+        print(
+            f"CONTINUITY       | "
+            f"{components['continuity']:.2f}%"
+        )
+
+    print("\n")
+    print("=" * 80)
+    print("STEP 2.28 SUMMARY")
+    print("=" * 80)
+
+    high = sum(
+        1
+        for result in results
+        if result["quality_level"] == "HIGH QUALITY"
+    )
+
+    medium = sum(
+        1
+        for result in results
+        if result["quality_level"] == "MEDIUM QUALITY"
+    )
+
+    low = sum(
+        1
+        for result in results
+        if result["quality_level"] == "LOW QUALITY"
+    )
+
+    print(
+        f"High-quality trajectories: "
+        f"{high}"
+    )
+
+    print(
+        f"Medium-quality trajectories: "
+        f"{medium}"
+    )
+
+    print(
+        f"Low-quality trajectories: "
+        f"{low}"
+    )
+
+
+def verify_step_2_28(results):
+    print("\n")
+    print("=" * 80)
+    print("STEP 2.28 VERIFICATION")
+    print("=" * 80)
+
+    structure_pass = True
+
+    required_fields = [
+        "plate_number",
+        "observation_count",
+        "quality_score",
+        "quality_level",
+        "components",
+    ]
+
+    required_components = [
+        "chronology",
+        "connectivity",
+        "movement",
+        "time_gaps",
+        "observation_density",
+        "continuity",
+    ]
+
+    for result in results:
+
+        for field in required_fields:
+            if field not in result:
+                structure_pass = False
+
+        for component in required_components:
+            if component not in result["components"]:
+                structure_pass = False
+
+    print(
+        "Quality result structure: "
+        f"{'PASS' if structure_pass else 'FAIL'}"
+    )
+
+    bounds_pass = all(
+        0.0 <= result["quality_score"] <= 100.0
+        for result in results
+    )
+
+    print(
+        "Quality score bounds: "
+        f"{'PASS' if bounds_pass else 'FAIL'}"
+    )
+
+    component_bounds_pass = all(
+        0.0 <= value <= 100.0
+        for result in results
+        for value in result["components"].values()
+    )
+
+    print(
+        "Component score bounds: "
+        f"{'PASS' if component_bounds_pass else 'FAIL'}"
+    )
+
+    quality_logic_pass = all(
+        (
+            (
+                result["quality_score"] >= HIGH_QUALITY_SCORE
+                and result["quality_level"] == "HIGH QUALITY"
+            )
+            or
+            (
+                MEDIUM_QUALITY_SCORE
+                <= result["quality_score"]
+                < HIGH_QUALITY_SCORE
+                and result["quality_level"]
+                == "MEDIUM QUALITY"
+            )
+            or
+            (
+                result["quality_score"] < MEDIUM_QUALITY_SCORE
+                and result["quality_level"]
+                == "LOW QUALITY"
+            )
+        )
+        for result in results
+    )
+
+    print(
+        "Quality classification logic: "
+        f"{'PASS' if quality_logic_pass else 'FAIL'}"
+    )
+
+    inconsistent_detection_pass = all(
+        (
+            result["quality_level"] != "HIGH QUALITY"
+        )
+        for result in results
+        if result["plate_number"]
+        in [
+            "DL05MN7890",
+            "DL06AB6789",
+        ]
+    )
+
+    print(
+        "Inconsistent trajectory quality reduction: "
+        f"{'PASS' if inconsistent_detection_pass else 'FAIL'}"
+    )
+
+    legitimate_revisit_pass = any(
+        (
+            result["plate_number"] == "DL04RT3456"
+            and result["quality_level"]
+            == "HIGH QUALITY"
+        )
+        for result in results
+    )
+
+    print(
+        "Legitimate camera revisit quality handling: "
+        f"{'PASS' if legitimate_revisit_pass else 'FAIL'}"
+    )
+
+    no_merge_pass = all(
+        "merged_trajectory" not in result
+        for result in results
+    )
+
+    print(
+        "No automatic trajectory merging: "
+        f"{'PASS' if no_merge_pass else 'FAIL'}"
+    )
+
+    return (
+        structure_pass
+        and bounds_pass
+        and component_bounds_pass
+        and quality_logic_pass
+        and inconsistent_detection_pass
+        and legitimate_revisit_pass
+        and no_merge_pass
+    )
+
+
+
+# ============================================================
+# STEP 2.29 — TRAJECTORY USABILITY CLASSIFICATION
+# ============================================================
+
+ANALYTICS_READY_SCORE = 85
+REVIEW_REQUIRED_SCORE = 65
+
+
+def classify_trajectory_usability(quality_result):
+    """
+    Converts the Step 2.28 trajectory quality score into
+    an operational usability classification.
+
+    HIGH QUALITY   -> ANALYTICS READY
+    MEDIUM QUALITY -> REVIEW REQUIRED
+    LOW QUALITY    -> ANALYTICS BLOCKED
+    """
+
+    score = quality_result["quality_score"]
+
+    if score >= ANALYTICS_READY_SCORE:
+        usability = "ANALYTICS READY"
+        reason = (
+            "Trajectory quality is sufficiently high "
+            "for downstream analytics."
+        )
+
+    elif score >= REVIEW_REQUIRED_SCORE:
+        usability = "REVIEW REQUIRED"
+        reason = (
+            "Trajectory contains reliability concerns "
+            "and should be reviewed before analytics use."
+        )
+
+    else:
+        usability = "ANALYTICS BLOCKED"
+        reason = (
+            "Trajectory quality is too low for reliable "
+            "downstream analytics."
+        )
+
+    return {
+        "plate_number": quality_result["plate_number"],
+        "quality_score": quality_result["quality_score"],
+        "quality_level": quality_result["quality_level"],
+        "usability": usability,
+        "reason": reason,
+    }
+
+
+def run_trajectory_usability_classification(
+    quality_results
+):
+    """
+    Classifies every trajectory produced by Step 2.28.
+    """
+
+    results = []
+
+    for quality_result in quality_results:
+
+        usability_result = (
+            classify_trajectory_usability(
+                quality_result
+            )
+        )
+
+        results.append(
+            usability_result
+        )
+
+    return results
+
+
+def print_step_2_29_results(results):
+    print("\n")
+    print("=" * 80)
+    print(
+        "STEP 2.29 - "
+        "TRAJECTORY USABILITY CLASSIFICATION"
+    )
+    print("=" * 80)
+
+    for result in results:
+
+        print("\nTRAJECTORY")
+        print("-" * 80)
+
+        print(
+            f"Plate: "
+            f"{result['plate_number']}"
+        )
+
+        print(
+            f"Quality score: "
+            f"{result['quality_score']:.2f}%"
+        )
+
+        print(
+            f"Quality level: "
+            f"{result['quality_level']}"
+        )
+
+        print(
+            f"Usability: "
+            f"{result['usability']}"
+        )
+
+        print(
+            f"Reason: "
+            f"{result['reason']}"
+        )
+
+    print("\n")
+    print("=" * 80)
+    print("STEP 2.29 SUMMARY")
+    print("=" * 80)
+
+    analytics_ready = sum(
+        1
+        for result in results
+        if result["usability"]
+        == "ANALYTICS READY"
+    )
+
+    review_required = sum(
+        1
+        for result in results
+        if result["usability"]
+        == "REVIEW REQUIRED"
+    )
+
+    analytics_blocked = sum(
+        1
+        for result in results
+        if result["usability"]
+        == "ANALYTICS BLOCKED"
+    )
+
+    print(
+        f"Analytics-ready trajectories: "
+        f"{analytics_ready}"
+    )
+
+    print(
+        f"Review-required trajectories: "
+        f"{review_required}"
+    )
+
+    print(
+        f"Analytics-blocked trajectories: "
+        f"{analytics_blocked}"
+    )
+
+
+def verify_step_2_29(results):
+    print("\n")
+    print("=" * 80)
+    print("STEP 2.29 VERIFICATION")
+    print("=" * 80)
+
+    # --------------------------------------------------------
+    # Structure
+    # --------------------------------------------------------
+
+    structure_pass = True
+
+    required_fields = [
+        "plate_number",
+        "quality_score",
+        "quality_level",
+        "usability",
+        "reason",
+    ]
+
+    for result in results:
+        for field in required_fields:
+            if field not in result:
+                structure_pass = False
+
+    print(
+        "Usability result structure: "
+        f"{'PASS' if structure_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Score bounds
+    # --------------------------------------------------------
+
+    bounds_pass = all(
+        0.0 <= result["quality_score"] <= 100.0
+        for result in results
+    )
+
+    print(
+        "Quality score bounds: "
+        f"{'PASS' if bounds_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Classification logic
+    # --------------------------------------------------------
+
+    classification_pass = True
+
+    for result in results:
+
+        score = result["quality_score"]
+        usability = result["usability"]
+
+        if score >= ANALYTICS_READY_SCORE:
+            expected = "ANALYTICS READY"
+
+        elif score >= REVIEW_REQUIRED_SCORE:
+            expected = "REVIEW REQUIRED"
+
+        else:
+            expected = "ANALYTICS BLOCKED"
+
+        if usability != expected:
+            classification_pass = False
+
+    print(
+        "Usability classification logic: "
+        f"{'PASS' if classification_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # High-quality trajectories must be analytics-ready
+    # --------------------------------------------------------
+
+    high_quality_pass = all(
+        result["usability"] == "ANALYTICS READY"
+        for result in results
+        if result["quality_level"]
+        == "HIGH QUALITY"
+    )
+
+    print(
+        "High-quality trajectory handling: "
+        f"{'PASS' if high_quality_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Low-quality trajectories must be blocked
+    # --------------------------------------------------------
+
+    low_quality_pass = all(
+        result["usability"]
+        == "ANALYTICS BLOCKED"
+        for result in results
+        if result["quality_level"]
+        == "LOW QUALITY"
+    )
+
+    print(
+        "Low-quality trajectory blocking: "
+        f"{'PASS' if low_quality_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Known inconsistent movement trajectory
+    # --------------------------------------------------------
+
+    movement_review_pass = any(
+        (
+            result["plate_number"]
+            == "DL05MN7890"
+            and result["usability"]
+            == "REVIEW REQUIRED"
+        )
+        for result in results
+    )
+
+    print(
+        "Inconsistent movement review handling: "
+        f"{'PASS' if movement_review_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Known disconnected trajectory
+    # --------------------------------------------------------
+
+    disconnected_block_pass = any(
+        (
+            result["plate_number"]
+            == "DL06AB6789"
+            and result["usability"]
+            == "ANALYTICS BLOCKED"
+        )
+        for result in results
+    )
+
+    print(
+        "Disconnected trajectory blocking: "
+        f"{'PASS' if disconnected_block_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Legitimate 30-minute revisit
+    # --------------------------------------------------------
+
+    revisit_pass = any(
+        (
+            result["plate_number"]
+            == "DL04RT3456"
+            and result["usability"]
+            == "ANALYTICS READY"
+        )
+        for result in results
+    )
+
+    print(
+        "Legitimate camera revisit usability: "
+        f"{'PASS' if revisit_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # No automatic merging
+    # --------------------------------------------------------
+
+    no_merge_pass = all(
+        "merged_trajectory" not in result
+        for result in results
+    )
+
+    print(
+        "No automatic trajectory merging: "
+        f"{'PASS' if no_merge_pass else 'FAIL'}"
+    )
+
+    return (
+        structure_pass
+        and bounds_pass
+        and classification_pass
+        and high_quality_pass
+        and low_quality_pass
+        and movement_review_pass
+        and disconnected_block_pass
+        and revisit_pass
+        and no_merge_pass
+    )
+
+
+
+
+# ============================================================
+# STEP 2.30 — PERSISTENT TRAJECTORY IDENTITY LAYER
+# ============================================================
+
+TRAJECTORY_ID_PREFIX = "TRAJ_"
+
+
+def generate_trajectory_id(index):
+    """
+    Generates a deterministic, human-readable trajectory ID.
+
+    Example:
+        1 -> TRAJ_0001
+        2 -> TRAJ_0002
+    """
+
+    return f"{TRAJECTORY_ID_PREFIX}{index:04d}"
+
+
+def _trajectory_sort_key(item):
+    """
+    Creates a deterministic ordering for trajectory identity assignment.
+
+    The earliest event time is the primary ordering signal. The normalized
+    primary plate is used as a stable tie-breaker.
+    """
+
+    plate, events = item
+
+    if events:
+        earliest_time = min(
+            parse_time(event["timestamp"])
+            for event in events
+        )
+    else:
+        earliest_time = datetime.max
+
+    return (
+        earliest_time,
+        normalize_plate_number(plate),
+    )
+
+
+def collect_observed_plates(trajectory_events):
+    """
+    Returns unique normalized plate observations belonging to this existing
+    trajectory. This function does NOT merge trajectories.
+    """
+
+    observed = []
+    seen = set()
+
+    for event in sorted(
+        trajectory_events,
+        key=lambda event: parse_time(event["timestamp"])
+    ):
+
+        plate = normalize_plate_number(
+            event.get("plate_number", "")
+        )
+
+        if not plate:
+            continue
+
+        if plate in seen:
+            continue
+
+        seen.add(plate)
+        observed.append(plate)
+
+    return observed
+
+
+def build_trajectory_identity_records(
+    trajectories,
+    quality_results,
+    usability_results,
+    confidence_results,
+):
+    """
+    Creates persistent internal identity records for the trajectories that
+    already exist after Step 2.29 processing.
+
+    Important:
+        - No trajectory merging is performed.
+        - Each existing trajectory receives exactly one trajectory_id.
+        - Existing quality/usability information is preserved.
+        - Original event IDs and camera sequence are preserved.
+    """
+
+    quality_by_plate = {
+        normalize_plate_number(result["plate_number"]): result
+        for result in quality_results
+    }
+
+    usability_by_plate = {
+        normalize_plate_number(result["plate_number"]): result
+        for result in usability_results
+    }
+
+    association_by_event_id = {}
+
+    for result in confidence_results:
+        observation = result["observation"]
+        association_by_event_id[observation["id"]] = {
+            "decision": result["decision"],
+            "confidence": result["confidence"]["overall_percent"],
+        }
+
+    records = []
+
+    sorted_trajectories = sorted(
+        trajectories.items(),
+        key=_trajectory_sort_key,
+    )
+
+    for index, (plate, events) in enumerate(
+        sorted_trajectories,
+        start=1,
+    ):
+
+        normalized_plate = normalize_plate_number(plate)
+        trajectory_id = generate_trajectory_id(index)
+
+        sorted_events = sorted(
+            events,
+            key=lambda event: parse_time(
+                event["timestamp"]
+            )
+        )
+
+        observed_plates = collect_observed_plates(
+            sorted_events
+        )
+
+        camera_sequence = [
+            event["camera_id"]
+            for event in sorted_events
+        ]
+
+        event_ids = [
+            event["id"]
+            for event in sorted_events
+        ]
+
+        observation_associations = []
+
+        for event_id in event_ids:
+            association = association_by_event_id.get(
+                event_id
+            )
+
+            if association is not None:
+                observation_associations.append({
+                    "event_id": event_id,
+                    "decision": association["decision"],
+                    "confidence": association["confidence"],
+                })
+
+        quality_result = quality_by_plate.get(
+            normalized_plate,
+            {}
+        )
+
+        usability_result = usability_by_plate.get(
+            normalized_plate,
+            {}
+        )
+
+        records.append({
+            "trajectory_id": trajectory_id,
+            "primary_plate": normalized_plate,
+            "observed_plates": observed_plates,
+            "event_ids": event_ids,
+            "observation_associations": observation_associations,
+            "camera_sequence": camera_sequence,
+            "event_count": len(sorted_events),
+            "quality_score": quality_result.get(
+                "quality_score"
+            ),
+            "quality_level": quality_result.get(
+                "quality_level"
+            ),
+            "usability": usability_result.get(
+                "usability"
+            ),
+        })
+
+    return records
+
+
+def run_identity_pipeline() -> dict:
+    """Run the verified trajectory pipeline through identity creation.
+
+    This consolidates the former Step 2.31 development pipeline so the
+    production handoff does not depend on a phase-numbered module.
+    """
+    filtered_events, low_confidence_removed = filter_low_confidence_events(EVENTS)
+    filtered_events, duplicate_removed = remove_same_camera_duplicates(filtered_events)
+    trajectories = build_trajectories(filtered_events)
+    fuzzy_matches = find_fuzzy_plate_matches(filtered_events)
+    validated_matches = validate_all_fuzzy_matches(fuzzy_matches)
+
+    association_observations = []
+    seen_event_ids = set()
+    for match in fuzzy_matches:
+        for event in (match["event_a"], match["event_b"]):
+            if event["id"] not in seen_event_ids:
+                association_observations.append(event)
+                seen_event_ids.add(event["id"])
+
+    association_results = run_trajectory_level_association(association_observations, trajectories)
+    consistency_results = apply_consistency_validation(association_results, trajectories)
+    confidence_results = apply_confidence_aggregation(consistency_results, trajectories)
+    confidence_results = apply_step_2_26_validation(confidence_results, trajectories)
+    continuity_results = run_trajectory_continuity_validation(trajectories)
+    quality_results = run_trajectory_quality_scoring(trajectories, continuity_results)
+    usability_results = run_trajectory_usability_classification(quality_results)
+    identity_records = build_trajectory_identity_records(trajectories, quality_results, usability_results, confidence_results)
+
+    return {
+        "filtered_events": filtered_events,
+        "low_confidence_removed": low_confidence_removed,
+        "duplicate_removed": duplicate_removed,
+        "trajectories": trajectories,
+        "fuzzy_matches": fuzzy_matches,
+        "validated_matches": validated_matches,
+        "confidence_results": confidence_results,
+        "quality_results": quality_results,
+        "usability_results": usability_results,
+        "identity_records": identity_records,
+    }
+
+
+def print_step_2_30_results(records):
+    print("\n")
+    print("=" * 80)
+    print("STEP 2.30 - PERSISTENT TRAJECTORY IDENTITY")
+    print("=" * 80)
+
+    for record in records:
+
+        print("\nTRAJECTORY IDENTITY")
+        print("-" * 80)
+
+        print(
+            f"Trajectory ID: "
+            f"{record['trajectory_id']}"
+        )
+
+        print(
+            f"Primary plate: "
+            f"{record['primary_plate']}"
+        )
+
+        print(
+            f"Observed plates: "
+            f"{record['observed_plates']}"
+        )
+
+        print(
+            f"Event IDs: "
+            f"{record['event_ids']}"
+        )
+
+        print(
+            f"Observation associations: "
+            f"{record['observation_associations']}"
+        )
+
+        print(
+            f"Camera sequence: "
+            f"{' → '.join(record['camera_sequence'])}"
+        )
+
+        print(
+            f"Event count: "
+            f"{record['event_count']}"
+        )
+
+        print(
+            f"Quality score: "
+            f"{record['quality_score']:.2f}%"
+            if record["quality_score"] is not None
+            else "Quality score: N/A"
+        )
+
+        print(
+            f"Quality level: "
+            f"{record['quality_level']}"
+        )
+
+        print(
+            f"Usability: "
+            f"{record['usability']}"
+        )
+
+    print("\n")
+    print("=" * 80)
+    print("STEP 2.30 SUMMARY")
+    print("=" * 80)
+    print(
+        f"Trajectory identities generated: "
+        f"{len(records)}"
+    )
+
+
+def verify_step_2_30(
+    records,
+    trajectories,
+    quality_results,
+    usability_results,
+    confidence_results,
+):
+    print("\n")
+    print("=" * 80)
+    print("STEP 2.30 VERIFICATION")
+    print("=" * 80)
+
+    # --------------------------------------------------------
+    # Structure
+    # --------------------------------------------------------
+
+    required_fields = [
+        "trajectory_id",
+        "primary_plate",
+        "observed_plates",
+        "event_ids",
+        "observation_associations",
+        "camera_sequence",
+        "event_count",
+        "quality_score",
+        "quality_level",
+        "usability",
+    ]
+
+    structure_pass = all(
+        all(
+            field in record
+            for field in required_fields
+        )
+        for record in records
+    )
+
+    print(
+        "Trajectory identity structure: "
+        f"{'PASS' if structure_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Exactly one identity per existing trajectory
+    # --------------------------------------------------------
+
+    identity_count_pass = (
+        len(records) == len(trajectories)
+    )
+
+    print(
+        "One ID per existing trajectory: "
+        f"{'PASS' if identity_count_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Unique IDs
+    # --------------------------------------------------------
+
+    ids = [
+        record["trajectory_id"]
+        for record in records
+    ]
+
+    unique_ids_pass = (
+        len(ids) == len(set(ids))
+        and all(
+            trajectory_id.startswith(
+                TRAJECTORY_ID_PREFIX
+            )
+            for trajectory_id in ids
+        )
+    )
+
+    print(
+        "Unique trajectory IDs: "
+        f"{'PASS' if unique_ids_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Sequential ID format
+    # --------------------------------------------------------
+
+    expected_ids = [
+        generate_trajectory_id(index)
+        for index in range(1, len(records) + 1)
+    ]
+
+    sequential_id_pass = (
+        ids == expected_ids
+    )
+
+    print(
+        "Sequential deterministic ID format: "
+        f"{'PASS' if sequential_id_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Deterministic assignment
+    # --------------------------------------------------------
+
+    second_run = build_trajectory_identity_records(
+        trajectories,
+        quality_results,
+        usability_results,
+        confidence_results,
+    )
+
+    deterministic_pass = (
+        [
+            record["trajectory_id"]
+            for record in second_run
+        ]
+        == ids
+    )
+
+    print(
+        "Deterministic ID assignment: "
+        f"{'PASS' if deterministic_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Primary plate preservation
+    # --------------------------------------------------------
+
+    primary_plate_pass = all(
+        record["primary_plate"]
+        == normalize_plate_number(
+            sorted(
+                trajectories.items(),
+                key=_trajectory_sort_key,
+            )[index][0]
+        )
+        for index, record in enumerate(records)
+    )
+
+    print(
+        "Primary plate preservation: "
+        f"{'PASS' if primary_plate_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Observed plate preservation
+    # --------------------------------------------------------
+
+    observed_plate_pass = True
+
+    for record in records:
+        original_events = trajectories[
+            record["primary_plate"]
+        ]
+
+        expected_plates = collect_observed_plates(
+            original_events
+        )
+
+        if record["observed_plates"] != expected_plates:
+            observed_plate_pass = False
+
+    print(
+        "Observed plate preservation: "
+        f"{'PASS' if observed_plate_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Quality/usability preservation
+    # --------------------------------------------------------
+
+    quality_by_plate = {
+        normalize_plate_number(result["plate_number"]): result
+        for result in quality_results
+    }
+
+    usability_by_plate = {
+        normalize_plate_number(result["plate_number"]): result
+        for result in usability_results
+    }
+
+    metadata_pass = True
+
+    for record in records:
+
+        plate = record["primary_plate"]
+        quality = quality_by_plate.get(plate, {})
+        usability = usability_by_plate.get(plate, {})
+
+        if record["quality_score"] != quality.get(
+            "quality_score"
+        ):
+            metadata_pass = False
+
+        if record["quality_level"] != quality.get(
+            "quality_level"
+        ):
+            metadata_pass = False
+
+        if record["usability"] != usability.get(
+            "usability"
+        ):
+            metadata_pass = False
+
+    print(
+        "Quality/usability metadata preservation: "
+        f"{'PASS' if metadata_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Ambiguity preservation
+    # --------------------------------------------------------
+
+    expected_ambiguous_events = {
+        202,
+        203,
+    }
+
+    ambiguous_event_decisions = {}
+
+    for record in records:
+        for association in record["observation_associations"]:
+            ambiguous_event_decisions[
+                association["event_id"]
+            ] = association["decision"]
+
+    ambiguity_pass = all(
+        ambiguous_event_decisions.get(event_id)
+        == "AMBIGUOUS / REVIEW"
+        for event_id in expected_ambiguous_events
+    )
+
+    print(
+        "Ambiguous observation preservation: "
+        f"{'PASS' if ambiguity_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Legitimate revisit preservation
+    # --------------------------------------------------------
+
+    revisit_pass = any(
+        record["primary_plate"]
+        == "DL04RT3456"
+        and record["camera_sequence"]
+        == [
+            "Camera_1",
+            "Camera_2",
+            "Camera_3",
+            "Camera_2",
+        ]
+        for record in records
+    )
+
+    print(
+        "Legitimate camera revisit preservation: "
+        f"{'PASS' if revisit_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Review trajectory preservation
+    # --------------------------------------------------------
+
+    review_pass = any(
+        record["primary_plate"]
+        == "DL05MN7890"
+        and record["usability"]
+        == "REVIEW REQUIRED"
+        for record in records
+    )
+
+    print(
+        "Review-required trajectory preservation: "
+        f"{'PASS' if review_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # Blocked trajectory preservation
+    # --------------------------------------------------------
+
+    blocked_pass = any(
+        record["primary_plate"]
+        == "DL06AB6789"
+        and record["usability"]
+        == "ANALYTICS BLOCKED"
+        for record in records
+    )
+
+    print(
+        "Analytics-blocked trajectory preservation: "
+        f"{'PASS' if blocked_pass else 'FAIL'}"
+    )
+
+    # --------------------------------------------------------
+    # No automatic merging
+    # --------------------------------------------------------
+
+    no_merge_pass = all(
+        "merged_trajectory" not in record
+        and "merged_from" not in record
+        for record in records
+    )
+
+    print(
+        "No automatic trajectory merging: "
+        f"{'PASS' if no_merge_pass else 'FAIL'}"
+    )
+
+    return (
+        structure_pass
+        and identity_count_pass
+        and unique_ids_pass
+        and sequential_id_pass
+        and deterministic_pass
+        and primary_plate_pass
+        and observed_plate_pass
+        and metadata_pass
+        and ambiguity_pass
+        and revisit_pass
+        and review_pass
+        and blocked_pass
+        and no_merge_pass
+    )
+
+
 # MAIN
 # ============================================================
 
@@ -3627,6 +5024,70 @@ def main():
     )
 
     # ========================================================
+    # STEP 2.28
+    # ========================================================
+
+    quality_results = (
+        run_trajectory_quality_scoring(
+            trajectories,
+            continuity_results
+        )
+    )
+
+    print_step_2_28_results(
+        quality_results
+    )
+
+    step_2_28_pass = verify_step_2_28(
+        quality_results
+    )
+
+    # ========================================================
+    # STEP 2.29
+    # ========================================================
+
+    usability_results = (
+        run_trajectory_usability_classification(
+            quality_results
+        )
+    )
+
+    print_step_2_29_results(
+        usability_results
+    )
+
+    step_2_29_pass = verify_step_2_29(
+        usability_results
+    )
+
+    # ========================================================
+    # STEP 2.30
+    # ========================================================
+
+    trajectory_identity_results = (
+        build_trajectory_identity_records(
+            trajectories,
+            quality_results,
+            usability_results,
+            confidence_results,
+        )
+    )
+
+    print_step_2_30_results(
+        trajectory_identity_results
+    )
+
+    step_2_30_pass = verify_step_2_30(
+        trajectory_identity_results,
+        trajectories,
+        quality_results,
+        usability_results,
+        confidence_results,
+    )
+
+
+
+    # ========================================================
     # STEP 2.25 VERIFICATION
     # ========================================================
 
@@ -3737,6 +5198,130 @@ def main():
     # ========================================================
 
     print("\n")
+    print("=" * 80)
+    print("STEP 2.30 FINAL STATUS")
+    print("=" * 80)
+
+    print(
+        "Persistent trajectory identity layer: "
+        f"{'PASS' if step_2_30_pass else 'FAIL'}"
+    )
+
+    if step_2_30_pass:
+
+        print(
+            "All Step 2.30 verification checks passed."
+        )
+
+        print(
+            "Deterministic trajectory IDs generated."
+        )
+
+        print(
+            "Trajectory metadata preserved."
+        )
+
+        print(
+            "Quality and usability status preserved."
+        )
+
+        print(
+            "No automatic trajectory merging performed."
+        )
+
+        print(
+            "No Supabase data was modified."
+        )
+
+    else:
+
+        print(
+            "Step 2.30 verification failed."
+        )
+
+    print("\n")
+
+    print("=" * 80)
+    print("STEP 2.29 FINAL STATUS")
+    print("=" * 80)
+
+    print(
+        "Trajectory usability classification: "
+        f"{'PASS' if step_2_29_pass else 'FAIL'}"
+    )
+
+    if step_2_29_pass:
+
+        print(
+            "All Step 2.29 verification checks passed."
+        )
+
+        print(
+            "Trajectory usability classifications generated."
+        )
+
+        print(
+            "Analytics-ready trajectories identified."
+        )
+
+        print(
+            "Review-required trajectories identified."
+        )
+
+        print(
+            "Low-quality trajectories blocked from analytics."
+        )
+
+        print(
+            "No automatic trajectory merging performed."
+        )
+
+        print(
+            "No Supabase data was modified."
+        )
+
+    else:
+
+        print(
+            "Step 2.29 verification failed."
+        )
+
+    print("\n")
+
+    print("=" * 80)
+    print("STEP 2.28 FINAL STATUS")
+    print("=" * 80)
+    print(
+        "Trajectory quality scoring: "
+        f"{'PASS' if step_2_28_pass else 'FAIL'}"
+    )
+
+    if step_2_28_pass:
+        print(
+            "All Step 2.28 verification checks passed."
+        )
+        print(
+            "Trajectory quality scores generated."
+        )
+        print(
+            "Reliability components calculated."
+        )
+        print(
+            "High, medium and low quality levels classified."
+        )
+        print(
+            "No automatic trajectory merging performed."
+        )
+        print(
+            "No Supabase data was modified."
+        )
+    else:
+        print(
+            "Step 2.28 verification failed."
+        )
+
+    print("\n")
+
     print("=" * 80)
     print("STEP 2.27 FINAL STATUS")
     print("=" * 80)

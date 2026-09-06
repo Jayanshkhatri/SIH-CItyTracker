@@ -7,10 +7,10 @@ import unittest
 
 import httpx
 
-from phase9_api import create_app
-from phase9_database import DataAccessError, SupabasePucRepository
-from phase9_pipeline import ReadOnlyDatabasePipeline
-from phase9_service import build_local_demo_service
+from api import create_app
+from supabase_repository import DataAccessError, SupabasePucRepository
+from data_pipeline import ReadOnlyDatabasePipeline
+from trajectory_service import build_local_demo_service
 from puc_verification import PUC_ALERT_TYPE, verify_puc
 
 

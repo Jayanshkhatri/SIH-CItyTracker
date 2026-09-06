@@ -8,23 +8,16 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
-import importlib.util
 from pathlib import Path
 from statistics import median
-import sys
 from typing import Any, Iterable
 
-import trajectory as engine
-from trajectory_phase7 import Phase7TrajectoryRepository, step_231
+import trajectory_engine as engine
+from trajectory_repository import Phase7TrajectoryRepository, run_identity_pipeline
 
-_network_spec = importlib.util.spec_from_file_location("trajectory_step_2_37", Path(__file__).with_name("trajectory_step_2.37.py"))
-if _network_spec is None or _network_spec.loader is None:
-    raise RuntimeError("Unable to load verified Step 2.37")
-_network_module = importlib.util.module_from_spec(_network_spec)
-sys.modules[_network_spec.name] = _network_module
-_network_spec.loader.exec_module(_network_module)
-ProductionCameraNetwork = _network_module.ProductionCameraNetwork
-verify_step_2_37 = _network_module.verify_step_2_37
+from network import ProductionCameraNetwork, verify_network
+verify_step_2_37 = verify_network
+
 
 MAX_SPEED_KMH = engine.MAX_PLAUSIBLE_SPEED_KMH
 MAX_GAP_SECONDS = engine.MAX_TRAJECTORY_GAP_SECONDS
@@ -174,7 +167,7 @@ class Phase8Analytics:
 
 
 def verify_phase8() -> bool:
-    pipeline=step_231.run_step_2_30_pipeline(); import tempfile; from pathlib import Path
+    pipeline=run_identity_pipeline(); import tempfile; from pathlib import Path
     with tempfile.TemporaryDirectory() as d:
         repo=Phase7TrajectoryRepository(Path(d)/"p.json"); repo.bootstrap(pipeline["identity_records"],pipeline["filtered_events"]); records=repo.query(); service=Phase8Analytics(ProductionCameraNetwork.from_development_graph()); alerts=service.anomalies(records); movement=service.movement(records,alerts); flows=service.flows(records,alerts); travel=service.travel_time(flows); density=service.congestion(flows); routes=service.routes(records,movement)
         checks={"2.38 anomalies":any(a["anomaly_type"]=="UNREALISTIC_SPEED" for a in alerts) and any(a["anomaly_type"]=="IMPOSSIBLE_ROUTE" for a in alerts),"2.39 movement":len(movement)==8 and next(x for x in movement if x["trajectory_id"]=="TRAJ_0001")["total_route_distance_km"] is not None,"2.40 directed flow":all(x["direction"]==f"{x['source_camera']}->{x['destination_camera']}" for x in flows),"2.41 travel":all(x["average_travel_seconds"]>0 for x in travel),"2.42 congestion":all(x["congestion_level"] in {"FREE_FLOW","LIGHT","MODERATE","HEAVY","SEVERE"} for x in density),"2.43 OD":bool(routes),"empty safety":service.flows([],[])==[] and service.congestion([])==[],"2.37 regression":verify_step_2_37()}

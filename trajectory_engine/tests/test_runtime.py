@@ -8,7 +8,7 @@ import unittest
 
 import httpx
 
-from phase10_runtime import Phase10Runtime, RuntimeConfig
+from runtime import Phase10Runtime, RuntimeConfig
 
 
 class _Reader:
@@ -122,6 +122,57 @@ class Phase10RuntimeTests(unittest.TestCase):
             self.assertTrue(result.succeeded)
             self.assertEqual(reader.event_calls, [(2, 0)])
             self.assertEqual(result.source_event_count, 1)
+
+    def test_configured_network_is_used_during_cam_id_reconstruction(self):
+        """Regression for the real CAM_01/CAM_02 legacy-graph KeyError."""
+        class SupabaseNamedReader(_Reader):
+            def fetch_cameras(self, *, limit):
+                self.camera_limits.append(limit)
+                return [
+                    {"id": "1", "name": "CAM_01", "lat": 28.6315, "lon": 77.2167,
+                     "coordinate_provenance": "SUPABASE"},
+                    {"id": "2", "name": "CAM_02", "lat": 28.6129, "lon": 77.2295,
+                     "coordinate_provenance": "SUPABASE"},
+                ]
+
+        reader = SupabaseNamedReader([
+            {"id": 1, "plate_number": "DL01AB1234", "camera_id": "1", "camera_name": "CAM_01",
+             "timestamp": "10:00:00", "event_timestamp": "2026-09-06T10:00:00", "event_date": "2026-09-06", "confidence": .95},
+            {"id": 2, "plate_number": "DL01AB1234", "camera_id": "2", "camera_name": "CAM_02",
+             "timestamp": "10:08:00", "event_timestamp": "2026-09-06T10:08:00", "event_date": "2026-09-06", "confidence": .95},
+        ])
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = self._runtime(
+                directory,
+                reader,
+                network_config_path=Path(__file__).parent.parent / "config" / "demo_network.json",
+            )
+            result = runtime.refresh()
+            self.assertTrue(result.succeeded)
+            self.assertEqual(runtime.status.network_provenance, "DEMO_NETWORK")
+            record = runtime.service.repository.query()[0]
+            self.assertEqual(record["identity"]["camera_sequence"], ["CAM_01", "CAM_02"])
+
+    def test_prepared_runtime_serves_every_frontend_handoff_endpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = self._runtime(directory)
+            self.assertTrue(runtime.refresh().succeeded)
+            app = runtime.create_app()
+
+            async def calls():
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                    paths = [
+                        "/v1/health", "/v1/ready", "/v1/trajectories",
+                        "/v1/trajectories/TRAJ_0001", "/v1/analytics/flows",
+                        "/v1/analytics/travel-times", "/v1/analytics/congestion",
+                        "/v1/analytics/origin-destinations", "/v1/alerts",
+                        "/v1/dashboard", "/v1/gis/cameras", "/v1/gis/trajectories",
+                    ]
+                    return [await client.get(path) for path in paths]
+
+            responses = asyncio.run(calls())
+            self.assertTrue(all(response.status_code == 200 for response in responses))
 
 
 if __name__ == "__main__":

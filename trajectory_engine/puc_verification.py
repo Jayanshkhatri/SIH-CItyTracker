@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Iterable
 
-from trajectory import normalize_plate_number
+from trajectory_engine import normalize_plate_number
 
 
 PUC_ALERT_TYPE = "PUC_UNVERIFIED"

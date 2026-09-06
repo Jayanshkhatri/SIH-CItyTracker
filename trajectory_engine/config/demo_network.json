@@ -1,0 +1,184 @@
+{
+  "metadata": {
+    "name": "SIH CityTracker Demo Network",
+    "version": "1.0",
+    "provenance": "SYNTHETIC_DEMO_NETWORK",
+    "description": "Synthetic directed camera network for development and demo runtime. This is not authoritative road/GIS data."
+  },
+  "cameras": {
+    "CAM_01": {
+      "name": "CAM_01",
+      "lat": 28.6315,
+      "lon": 77.2167
+    },
+    "CAM_02": {
+      "name": "CAM_02",
+      "lat": 28.6129,
+      "lon": 77.2295
+    },
+    "CAM_03": {
+      "name": "CAM_03",
+      "lat": 28.6519,
+      "lon": 77.1909
+    },
+    "CAM_04": {
+      "name": "CAM_04",
+      "lat": 28.6350,
+      "lon": 77.2090
+    },
+    "CAM_05": {
+      "name": "CAM_05",
+      "lat": 28.6200,
+      "lon": 77.2400
+    },
+    "CAM_06": {
+      "name": "CAM_06",
+      "lat": 28.6400,
+      "lon": 77.1800
+    },
+    "CAM_07": {
+      "name": "CAM_07",
+      "lat": 28.6250,
+      "lon": 77.2500
+    },
+    "CAM_08": {
+      "name": "CAM_08",
+      "lat": 28.6600,
+      "lon": 77.2050
+    }
+  },
+  "connections": [
+    {
+      "connection_id": "D01",
+      "source": "CAM_01",
+      "destination": "CAM_02",
+      "segment": "DEMO_SEGMENT_01",
+      "direction": "FORWARD",
+      "distance_km": 1.2,
+      "expected_travel_seconds": 240,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D02",
+      "source": "CAM_02",
+      "destination": "CAM_03",
+      "segment": "DEMO_SEGMENT_02",
+      "direction": "FORWARD",
+      "distance_km": 2.1,
+      "expected_travel_seconds": 420,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D03",
+      "source": "CAM_03",
+      "destination": "CAM_04",
+      "segment": "DEMO_SEGMENT_03",
+      "direction": "FORWARD",
+      "distance_km": 1.7,
+      "expected_travel_seconds": 300,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D04",
+      "source": "CAM_04",
+      "destination": "CAM_05",
+      "segment": "DEMO_SEGMENT_04",
+      "direction": "FORWARD",
+      "distance_km": 1.8,
+      "expected_travel_seconds": 360,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D05",
+      "source": "CAM_05",
+      "destination": "CAM_06",
+      "segment": "DEMO_SEGMENT_05",
+      "direction": "FORWARD",
+      "distance_km": 2.2,
+      "expected_travel_seconds": 420,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D06",
+      "source": "CAM_06",
+      "destination": "CAM_07",
+      "segment": "DEMO_SEGMENT_06",
+      "direction": "FORWARD",
+      "distance_km": 2.4,
+      "expected_travel_seconds": 420,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D07",
+      "source": "CAM_07",
+      "destination": "CAM_08",
+      "segment": "DEMO_SEGMENT_07",
+      "direction": "FORWARD",
+      "distance_km": 2.5,
+      "expected_travel_seconds": 480,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D08",
+      "source": "CAM_08",
+      "destination": "CAM_01",
+      "segment": "DEMO_SEGMENT_08",
+      "direction": "FORWARD",
+      "distance_km": 3.0,
+      "expected_travel_seconds": 540,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D09",
+      "source": "CAM_02",
+      "destination": "CAM_04",
+      "segment": "DEMO_SEGMENT_09",
+      "direction": "FORWARD",
+      "distance_km": 2.0,
+      "expected_travel_seconds": 360,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D10",
+      "source": "CAM_04",
+      "destination": "CAM_06",
+      "segment": "DEMO_SEGMENT_10",
+      "direction": "FORWARD",
+      "distance_km": 2.3,
+      "expected_travel_seconds": 420,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D11",
+      "source": "CAM_06",
+      "destination": "CAM_03",
+      "segment": "DEMO_SEGMENT_11",
+      "direction": "FORWARD",
+      "distance_km": 2.0,
+      "expected_travel_seconds": 360,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    },
+    {
+      "connection_id": "D12",
+      "source": "CAM_03",
+      "destination": "CAM_08",
+      "segment": "DEMO_SEGMENT_12",
+      "direction": "FORWARD",
+      "distance_km": 2.8,
+      "expected_travel_seconds": 480,
+      "speed_limit_kmh": 60,
+      "enabled": true
+    }
+  ]
+}

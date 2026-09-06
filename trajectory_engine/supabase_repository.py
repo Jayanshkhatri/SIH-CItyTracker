@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable
 
-from phase9_logging import logger, timed
+from logging_utils import logger, timed
 from puc_verification import PUC_ALERT_TYPE, PucVerificationResult
 
 

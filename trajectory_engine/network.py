@@ -10,8 +10,8 @@ from dataclasses import asdict, dataclass, field
 import heapq
 from typing import Any
 
-import trajectory as engine
-import trajectory_phase7 as phase7
+import trajectory_engine as engine
+import trajectory_repository as phase7
 
 
 @dataclass(frozen=True)
@@ -118,7 +118,7 @@ class ProductionCameraNetwork:
         return {"status": status, "source_camera": source, "destination_camera": destination, "camera_sequence": cameras, "connections": [asdict(item) for item in connections], "distance_km": distance, "expected_travel_seconds": expected if has_expected else None, "speed_limit_kmh": [item.speed_limit_kmh for item in connections], "distance_sources": [item.metadata.get("distance_source", "EXPLICIT_NETWORK") if item.distance_km is None else "EXPLICIT_NETWORK" for item in connections]}
 
 
-def verify_step_2_37() -> bool:
+def verify_network() -> bool:
     network = ProductionCameraNetwork.from_development_graph()
     normal = network.route("Camera_1", "Camera_3")
     disconnected = network.route("Camera_1", "Camera_5")
@@ -143,4 +143,4 @@ def verify_step_2_37() -> bool:
 
 
 if __name__ == "__main__":
-    raise SystemExit(0 if verify_step_2_37() else 1)
+    raise SystemExit(0 if verify_network() else 1)
