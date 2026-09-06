@@ -1,0 +1,11 @@
+node_modules/
+dist/
+demo.db
+demo.db-journal
+demo.db-wal
+demo.db-shm
+.env
+*.log
+.venv/
+__pycache__/
+*.pyc
